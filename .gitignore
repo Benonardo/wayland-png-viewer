@@ -1,0 +1,7 @@
+build/
+build_opt/
+
+.cache/
+compile_commands.json
+
+*.png
