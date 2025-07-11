@@ -16,7 +16,7 @@ endif
 _HEADERS = xdg-shell.h
 HEADERS = $(patsubst %,$(IDIR)/%,$(_HEADERS))
 
-_OBJ = main.o xdg-shell.o
+_OBJ = main.o xdg-shell.o wp-viewporter.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/viewer: $(OBJ) | $(ODIR)

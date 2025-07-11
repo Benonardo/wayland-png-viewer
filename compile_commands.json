@@ -1,0 +1,59 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O0",
+      "-DDEBUG",
+      "-g",
+      "-o",
+      "build/main.o",
+      "src/main.c"
+    ],
+    "directory": "/home/benonardo/Projects/cursedpng/viewer",
+    "file": "/home/benonardo/Projects/cursedpng/viewer/src/main.c",
+    "output": "/home/benonardo/Projects/cursedpng/viewer/build/main.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O0",
+      "-DDEBUG",
+      "-g",
+      "-o",
+      "build/xdg-shell.o",
+      "src/xdg-shell.c"
+    ],
+    "directory": "/home/benonardo/Projects/cursedpng/viewer",
+    "file": "/home/benonardo/Projects/cursedpng/viewer/src/xdg-shell.c",
+    "output": "/home/benonardo/Projects/cursedpng/viewer/build/xdg-shell.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O0",
+      "-DDEBUG",
+      "-g",
+      "-o",
+      "build/wp-viewporter.o",
+      "src/wp-viewporter.c"
+    ],
+    "directory": "/home/benonardo/Projects/cursedpng/viewer",
+    "file": "/home/benonardo/Projects/cursedpng/viewer/src/wp-viewporter.c",
+    "output": "/home/benonardo/Projects/cursedpng/viewer/build/wp-viewporter.o"
+  }
+]

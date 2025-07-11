@@ -10,12 +10,17 @@
 #include <unistd.h>
 
 #include <png.h>
+#include <wayland-client-core.h>
 #include <wayland-client.h>
+#include <wp-viewporter.h>
 #include <xdg-shell.h>
+
+bool viewporter = false;
 
 static struct wl_compositor *wayland_compositor;
 static struct xdg_wm_base *wayland_xdg_wm_base;
 static struct wl_shm *wayland_shm;
+static struct wp_viewporter *wayland_wp_viewporter;
 
 static void wayland_registry_global_listener(
     __attribute__((unused)) void *data, struct wl_registry *wayland_registry,
@@ -29,6 +34,9 @@ static void wayland_registry_global_listener(
   } else if (strcmp(interface, "wl_shm") == 0) {
     wayland_shm =
         wl_registry_bind(wayland_registry, name, &wl_shm_interface, version);
+  } else if (viewporter && strcmp(interface, "wp_viewporter") == 0) {
+    wayland_wp_viewporter = wl_registry_bind(wayland_registry, name,
+                                             &wp_viewporter_interface, version);
   }
 }
 
@@ -40,6 +48,7 @@ wayland_xdg_wm_base_ping_listener(__attribute__((unused)) void *data,
 }
 
 static bool should_resize = true;
+static bool should_recommit = false;
 static uint32_t window_width;
 static uint32_t window_height;
 
@@ -47,24 +56,26 @@ static void
 wayland_xdg_surface_configure_listener(__attribute__((unused)) void *data,
                                        struct xdg_surface *xdg_surface,
                                        uint32_t serial) {
+  puts("aaa");
   xdg_surface_ack_configure(xdg_surface, serial);
-  if (window_width != 0 && window_height != 0) {
-    should_resize = true;
-  }
+  should_recommit = true;
 }
 
 static void wayland_xdg_toplevel_configure_listener(
     __attribute__((unused)) void *data,
     __attribute__((unused)) struct xdg_toplevel *xdg_toplevel, int32_t width,
     int32_t height, __attribute__((unused)) struct wl_array *states) {
-  window_width = width;
-  window_height = height;
+  if (width != 0 && height != 0) {
+    window_width = width;
+    window_height = height;
+    should_resize = true;
+  }
 }
 
 static void wayland_xdg_toplevel_close_listener(
     __attribute__((unused)) void *data,
     __attribute__((unused)) struct xdg_toplevel *xdg_toplevel) {
-  exit(0);
+  exit(EXIT_SUCCESS);
 }
 
 static void wayland_xdg_toplevel_configure_bounds_handler(
@@ -79,8 +90,46 @@ static void wayland_xdg_toplevel_wm_capabilities_handler(
     __attribute__((unused)) struct wl_array *capabilities) {}
 
 int main(int argc, char **argv) {
-  assert(argc == 2);
-  FILE *file = fopen(argv[1], "r");
+  char *filename = NULL;
+  for (int i = 1; i < argc; i++) {
+    char *arg = argv[i];
+    size_t len = strlen(arg);
+    if (len > 2 && arg[0] == '-' && arg[1] == '-') {
+      char *long_option = arg + 2;
+      if (strcmp(long_option, "viewporter") == 0) {
+        viewporter = true;
+      } else {
+        write(STDERR_FILENO, "unknown long option '", 21);
+        write(STDERR_FILENO, long_option, len - 2);
+        write(STDERR_FILENO, "'\n", 2);
+        return EXIT_FAILURE;
+      }
+    } else if (len > 1 && arg[0] == '-') {
+      for (size_t j = 1; j < len; j++) {
+        char short_option = arg[j];
+        switch (short_option) {
+        case 'v':
+          viewporter = true;
+          break;
+        default:
+          write(STDERR_FILENO, "unknown short option '", 22);
+          write(STDERR_FILENO, &short_option, 1);
+          write(STDERR_FILENO, "'\n", 2);
+          return EXIT_FAILURE;
+        }
+      }
+
+    } else if (filename == NULL) {
+      filename = arg;
+    }
+  }
+
+  if (filename == NULL) {
+    write(STDERR_FILENO, "no file name specified", 22);
+    return EXIT_FAILURE;
+  }
+
+  FILE *file = fopen(filename, "r");
   assert(file != NULL);
 
   png_structp png =
@@ -95,7 +144,7 @@ int main(int argc, char **argv) {
                    PNG_TRANSFORM_EXPAND | PNG_TRANSFORM_BGR,
                NULL);
 
-  uint32_t **png_rows = (uint32_t **)png_get_rows(png, png_info);
+  png_bytepp png_rows = png_get_rows(png, png_info);
   assert(png_rows != NULL);
   png_uint_32 png_height = png_get_image_height(png, png_info);
   png_uint_32 png_width = png_get_image_width(png, png_info);
@@ -115,6 +164,9 @@ int main(int argc, char **argv) {
   assert(wayland_compositor != NULL);
   assert(wayland_xdg_wm_base != NULL);
   assert(wayland_shm != NULL);
+  if (viewporter) {
+    assert(wayland_wp_viewporter != NULL);
+  }
 
   struct xdg_wm_base_listener wayland_xdg_wm_base_listener = {
       wayland_xdg_wm_base_ping_listener};
@@ -145,86 +197,55 @@ int main(int argc, char **argv) {
   xdg_toplevel_add_listener(wayland_xdg_toplevel,
                             &wayland_xdg_toplevel_listener, NULL);
 
+  size_t size = 4 * png_width * png_height;
   int fd = syscall(SYS_memfd_create, "wayland shm", 0);
+  assert(fd != -1);
+  ftruncate(fd, size);
 
-  struct wl_shm_pool *wayland_shm_pool = wl_shm_create_pool(wayland_shm, fd, 1);
+  if (viewporter) {
+    uint8_t *pixel_data = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
+    assert(pixel_data != NULL);
+    for (uint32_t y = 0; y < png_height; y++) {
+      memcpy(pixel_data + y * png_width * 4, png_rows[y], png_width * 4);
+    }
+    msync(pixel_data, size, MS_SYNC);
+    munmap(pixel_data, size);
+  }
+
+  struct wl_shm_pool *wayland_shm_pool =
+      wl_shm_create_pool(wayland_shm, fd, size);
   assert(wayland_shm_pool != NULL);
 
-  window_width = png_width * 16;
-  window_height = png_height * 16;
-  size_t max_pool_size = 1;
+  struct wl_buffer *wayland_buffer =
+      wl_shm_pool_create_buffer(wayland_shm_pool, 0, png_width, png_height,
+                                png_width * 4, WL_SHM_FORMAT_ARGB8888);
+  assert(wayland_buffer != NULL);
+
+  wl_surface_commit(wayland_surface);
+
+  window_width = 16 * png_width;
+  window_height = 16 * png_height;
+
+  struct wp_viewport *wayland_wp_viewport =
+      wp_viewporter_get_viewport(wayland_wp_viewporter, wayland_surface);
+  assert(wayland_wp_viewport != NULL);
+  wp_viewport_set_source(wayland_wp_viewport, 0, 0, png_width, png_height);
+  wp_viewport_set_destination(wayland_wp_viewport, window_width, window_height);
+
+  bool is_attached = false;
   for (;;) {
     if (should_resize) {
-      if (window_width < png_width) {
-        window_width = png_width;
-      }
-      if (window_height < png_height) {
-        window_height = png_height;
-      }
-      size_t size = 4 * window_width * window_height;
-      if (size > max_pool_size) {
-        wl_shm_pool_resize(wayland_shm_pool, size);
-        ftruncate(fd, size);
-        max_pool_size = size;
-      }
-
-      size_t x_padding = 0;
-      size_t y_padding = 0;
-      size_t scale = 1;
-      if (window_width / window_height > png_width / png_height) {
-        puts("first");
-        scale = window_height / png_height;
-        if (window_width > png_width * scale) {
-          x_padding = (window_width - png_width * scale) / 2;
-        }
-      } else {
-        puts("second");
-        scale = window_width / png_width;
-        if (window_height > png_height * scale) {
-          y_padding = (window_height - png_height * scale) / 2;
-        }
-      }
-      printf("\tscale: %lu\n", scale);
-      printf("\tx %lu y %lu\n", x_padding, y_padding);
-
-      uint32_t *pixel_data = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
-      memset(pixel_data, 0xFF, size);
-      for (size_t window_y = 0; window_y < y_padding; window_y++) {
-        for (size_t window_x = 0; window_x < window_width; window_x++) {
-          pixel_data[window_y * window_width + window_x] = 0xFF000000;
-        }
-      }
-      for (size_t window_y = 0; window_y < window_height - y_padding * 2;
-           window_y++) {
-        for (size_t window_x = 0; window_x < x_padding; window_x++) {
-          pixel_data[y_padding * window_width + window_y * window_width +
-                     window_x] = 0xFF000000;
-        }
-
-        for (size_t window_x = 0; window_x < x_padding; window_x++) {
-          pixel_data[y_padding * window_width + window_y * window_width +
-                     x_padding + (window_width - x_padding * 2) + window_x] =
-              0xFF000000;
-        }
-      }
-      for (size_t window_y = 0; window_y < y_padding; window_y++) {
-        for (size_t window_x = 0; window_x < window_width; window_x++) {
-          pixel_data[y_padding * window_width +
-                     (window_height - y_padding * 2) * window_width +
-                     window_y * window_width + window_x] = 0xFF000000;
-        }
-      }
-      munmap(pixel_data, size);
-
-      struct wl_buffer *wayland_buffer = wl_shm_pool_create_buffer(
-          wayland_shm_pool, 0, window_width, window_height, 4 * window_width,
-          WL_SHM_FORMAT_ARGB8888);
-      assert(wayland_buffer != NULL);
-
-      wl_surface_attach(wayland_surface, wayland_buffer, 0, 0);
-      wl_surface_commit(wayland_surface);
-
+      wp_viewport_set_destination(wayland_wp_viewport, window_width,
+                                  window_height);
       should_resize = false;
+    }
+    if (should_recommit) {
+      if (!is_attached) {
+        wl_surface_attach(wayland_surface, wayland_buffer, 0, 0);
+        is_attached = true;
+      }
+      wl_surface_commit(wayland_surface);
+      should_recommit = false;
     }
     wl_display_dispatch(wayland_display);
   }
