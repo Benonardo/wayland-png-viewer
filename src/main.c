@@ -95,7 +95,6 @@ static void wayland_xdg_toplevel_configure_bounds_handler(
     __attribute__((unused)) void *data,
     __attribute__((unused)) struct xdg_toplevel *xdg_toplevel, int32_t width,
     int32_t height) {
-  puts("bounds");
   if (width != 0) {
     bounds_width = width;
     if (window_width > bounds_width) {
@@ -235,18 +234,12 @@ int main(int argc, char **argv) {
       int32_t y_padding = 0;
       int32_t scale = 1;
       if ((float)window_width / window_height > (float)png_width / png_height) {
-        puts("first");
         scale = window_height / png_height;
         x_padding = (window_width - png_width * scale) / 2;
       } else {
-        puts("second");
         scale = window_width / png_width;
         y_padding = (window_height - png_height * scale) / 2;
       }
-      printf("\t%f %f\n", (float)window_width / window_height,
-             (float)png_width / png_height);
-      printf("\tscale: %d\n", scale);
-      printf("\tx %d y %d\n", x_padding, y_padding);
 
       uint32_t *pixel_data = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
       assert(pixel_data != NULL);

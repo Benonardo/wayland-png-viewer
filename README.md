@@ -1,4 +1,4 @@
-# A pixel-perfect PNG-viewer for Wayland
+# Minimalistic pixel-perfect PNG-viewer for Wayland
 
 ## Building
 
@@ -10,4 +10,4 @@ Requires libpng and Wayland to be installed.
 
 The filepath is the only command line argument.
 
-It has inbuilt pixel-perfect scaling, so there might be a lot of padding with excentric aspect ratios. For an experimental solution using the Wayland viewporter, see the `viewporter` branch.
+It has inbuilt pixel-perfect scaling, so there might be a lot of padding with excentric aspect ratios and downscaling is not supported. For an experimental solution using the Wayland viewporter, see the (possibly outdated) `viewporter` branch.

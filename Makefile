@@ -19,7 +19,7 @@ HEADERS = $(patsubst %,$(IDIR)/%,$(_HEADERS))
 _OBJ = main.o xdg-shell.o zxdg-decoration.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
-$(ODIR)/viewer: $(OBJ) | $(ODIR)
+$(ODIR)/wayland-png-viewer: $(OBJ) | $(ODIR)
 	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 $(ODIR):
@@ -28,7 +28,7 @@ $(ODIR):
 $(ODIR)/%.o: $(SRCDIR)/%.c $(HEADERS) | $(ODIR)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
-run: $(ODIR)/viewer
+run: $(ODIR)/wayland-png-viewer
 	./$<
 
 .PHONY: clean
