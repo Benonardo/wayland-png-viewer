@@ -20,13 +20,13 @@ _OBJ = main.o xdg-shell.o zxdg-decoration.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/viewer: $(OBJ) | $(ODIR)
-	clang -o $@ $^ $(CFLAGS) $(LDFLAGS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 $(ODIR):
 	mkdir $(ODIR)
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(HEADERS) | $(ODIR)
-	clang -c -o $@ $< $(CFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 run: $(ODIR)/viewer
 	./$<
