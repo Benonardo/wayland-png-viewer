@@ -13,10 +13,10 @@ CFLAGS += -O3 -flto -march=native
 LDFLAGS += -s
 endif
 
-_HEADERS = xdg-shell.h
+_HEADERS = xdg-shell.h zxdg-decoration.h
 HEADERS = $(patsubst %,$(IDIR)/%,$(_HEADERS))
 
-_OBJ = main.o xdg-shell.o
+_OBJ = main.o xdg-shell.o zxdg-decoration.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/viewer: $(OBJ) | $(ODIR)
