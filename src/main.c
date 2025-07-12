@@ -15,8 +15,6 @@
 #include <wp-viewporter.h>
 #include <xdg-shell.h>
 
-bool viewporter = false;
-
 static struct wl_compositor *wayland_compositor;
 static struct xdg_wm_base *wayland_xdg_wm_base;
 static struct wl_shm *wayland_shm;
@@ -34,7 +32,7 @@ static void wayland_registry_global_listener(
   } else if (strcmp(interface, "wl_shm") == 0) {
     wayland_shm =
         wl_registry_bind(wayland_registry, name, &wl_shm_interface, version);
-  } else if (viewporter && strcmp(interface, "wp_viewporter") == 0) {
+  } else if (strcmp(interface, "wp_viewporter") == 0) {
     wayland_wp_viewporter = wl_registry_bind(wayland_registry, name,
                                              &wp_viewporter_interface, version);
   }
@@ -56,7 +54,6 @@ static void
 wayland_xdg_surface_configure_listener(__attribute__((unused)) void *data,
                                        struct xdg_surface *xdg_surface,
                                        uint32_t serial) {
-  puts("aaa");
   xdg_surface_ack_configure(xdg_surface, serial);
   should_recommit = true;
 }
@@ -90,46 +87,8 @@ static void wayland_xdg_toplevel_wm_capabilities_handler(
     __attribute__((unused)) struct wl_array *capabilities) {}
 
 int main(int argc, char **argv) {
-  char *filename = NULL;
-  for (int i = 1; i < argc; i++) {
-    char *arg = argv[i];
-    size_t len = strlen(arg);
-    if (len > 2 && arg[0] == '-' && arg[1] == '-') {
-      char *long_option = arg + 2;
-      if (strcmp(long_option, "viewporter") == 0) {
-        viewporter = true;
-      } else {
-        write(STDERR_FILENO, "unknown long option '", 21);
-        write(STDERR_FILENO, long_option, len - 2);
-        write(STDERR_FILENO, "'\n", 2);
-        return EXIT_FAILURE;
-      }
-    } else if (len > 1 && arg[0] == '-') {
-      for (size_t j = 1; j < len; j++) {
-        char short_option = arg[j];
-        switch (short_option) {
-        case 'v':
-          viewporter = true;
-          break;
-        default:
-          write(STDERR_FILENO, "unknown short option '", 22);
-          write(STDERR_FILENO, &short_option, 1);
-          write(STDERR_FILENO, "'\n", 2);
-          return EXIT_FAILURE;
-        }
-      }
-
-    } else if (filename == NULL) {
-      filename = arg;
-    }
-  }
-
-  if (filename == NULL) {
-    write(STDERR_FILENO, "no file name specified", 22);
-    return EXIT_FAILURE;
-  }
-
-  FILE *file = fopen(filename, "r");
+  assert(argc == 2);
+  FILE *file = fopen(argv[1], "r");
   assert(file != NULL);
 
   png_structp png =
@@ -164,9 +123,7 @@ int main(int argc, char **argv) {
   assert(wayland_compositor != NULL);
   assert(wayland_xdg_wm_base != NULL);
   assert(wayland_shm != NULL);
-  if (viewporter) {
-    assert(wayland_wp_viewporter != NULL);
-  }
+  assert(wayland_wp_viewporter != NULL);
 
   struct xdg_wm_base_listener wayland_xdg_wm_base_listener = {
       wayland_xdg_wm_base_ping_listener};
@@ -200,17 +157,15 @@ int main(int argc, char **argv) {
   size_t size = 4 * png_width * png_height;
   int fd = syscall(SYS_memfd_create, "wayland shm", 0);
   assert(fd != -1);
-  ftruncate(fd, size);
 
-  if (viewporter) {
-    uint8_t *pixel_data = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
-    assert(pixel_data != NULL);
-    for (uint32_t y = 0; y < png_height; y++) {
-      memcpy(pixel_data + y * png_width * 4, png_rows[y], png_width * 4);
-    }
-    msync(pixel_data, size, MS_SYNC);
-    munmap(pixel_data, size);
+  ftruncate(fd, size);
+  uint8_t *pixel_data = mmap(0, size, PROT_WRITE, MAP_SHARED, fd, 0);
+  assert(pixel_data != NULL);
+  for (uint32_t y = 0; y < png_height; y++) {
+    memcpy(pixel_data + y * png_width * 4, png_rows[y], png_width * 4);
   }
+  msync(pixel_data, size, MS_SYNC);
+  munmap(pixel_data, size);
 
   struct wl_shm_pool *wayland_shm_pool =
       wl_shm_create_pool(wayland_shm, fd, size);
