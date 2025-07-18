@@ -9,7 +9,7 @@ ODIR=build
 CFLAGS += -O0 -DDEBUG -g
 else
 ODIR=build_opt
-CFLAGS += -O3 -flto -march=native
+CFLAGS += -O3 -flto
 LDFLAGS += -s
 endif
 
