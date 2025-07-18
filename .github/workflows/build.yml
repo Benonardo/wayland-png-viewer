@@ -23,5 +23,5 @@ jobs:
         CC: clang
     - uses: actions/upload-artifact@v4
       with:
-        name: wayland-png-viewer
+        name: wayland-png-viewer - ${{ matrix.os }}
         path: build_opt/wayland-png-viewer
